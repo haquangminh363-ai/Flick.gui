@@ -1,0 +1,165 @@
+-- Xóa GUI cũ để tránh trùng lặp
+if game.CoreGui:FindFirstChild("DeltaLeftMacro") then game.CoreGui.DeltaLeftMacro:Destroy() end
+if game.CoreGui:FindFirstChild("DeltaRightMacro") then game.CoreGui.DeltaRightMacro:Destroy() end
+
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local states = { W = false, A = false, S = false, D = false, Space = false }
+local buttons = {}
+
+----------------------------------------------------
+-- 1. KHUNG BÊN TRÁI: CỤM DI CHUYỂN W-A-S-D (ĐÈ NÚT)
+----------------------------------------------------
+local LeftGui = Instance.new("ScreenGui")
+LeftGui.Name = "DeltaLeftMacro"
+LeftGui.Parent = game.CoreGui
+LeftGui.ResetOnSpawn = false
+
+local LeftFrame = Instance.new("Frame")
+LeftFrame.Name = "LeftFrame"
+LeftFrame.Parent = LeftGui
+LeftFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+LeftFrame.BackgroundTransparency = 0.2
+LeftFrame.Position = UDim2.new(0, 20, 0.4, 0) 
+LeftFrame.Size = UDim2.new(0, 130, 0, 110)
+LeftFrame.Active = true
+LeftFrame.Draggable = true
+Instance.new("UICorner", LeftFrame).CornerRadius = UDim.new(0, 10)
+
+local MovementFrame = Instance.new("Frame")
+MovementFrame.Size = UDim2.new(1, 0, 1, 0)
+MovementFrame.BackgroundTransparency = 1
+MovementFrame.Parent = LeftFrame
+
+-- Hàm tạo nút Di Chuyển dạng ĐÈ (Hold to walk)
+local function createHoldButton(name, keyCode, size, pos)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = size
+    Btn.Position = pos
+    Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    Btn.Text = name
+    Btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Btn.TextSize = 16
+    Btn.Font = Enum.Font.SourceSansBold
+    Btn.Parent = MovementFrame
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    buttons[name] = Btn
+
+    -- Vòng lặp giữ phím khi đang đè ngón tay
+    task.spawn(function()
+        while true do
+            if states[name] then
+                VirtualInputManager:SendKeyEvent(true, keyCode, false, game)
+                task.wait(0.05)
+            else
+                task.wait(0.1)
+            end
+        end
+    end)
+
+    -- Khi ẤN VÀ ĐÈ NGÓN TAY XUỐNG
+    Btn.MouseButton1Down:Connect(function()
+        states[name] = true
+        Btn.BackgroundColor3 = Color3.fromRGB(46, 139, 87) -- Đổi sang xanh lá
+    end)
+
+    -- Khi BUÔNG NGÓN TAY RA
+    Btn.MouseButton1Up:Connect(function()
+        states[name] = false
+        Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) -- Về màu xám
+        VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+    end)
+
+    -- Đề phòng trường hợp vuốt tay ra rìa nút khiến nút bị kẹt
+    Btn.MouseLeave:Connect(function()
+        if states[name] then
+            states[name] = false
+            Btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+            VirtualInputManager:SendKeyEvent(false, keyCode, false, game)
+        end
+    end)
+end
+
+-- Tạo 4 nút WASD (Đè để đi)
+createMoveButton = createHoldButton -- Gán lại hàm
+createMoveButton("W", Enum.KeyCode.W, UDim2.new(0, 36, 0, 36), UDim2.new(0.5, -18, 0, 10))   
+createMoveButton("A", Enum.KeyCode.A, UDim2.new(0, 36, 0, 36), UDim2.new(0, 10, 0, 52))     
+createMoveButton("S", Enum.KeyCode.S, UDim2.new(0, 36, 0, 36), UDim2.new(0.5, -18, 0, 52))  
+createMoveButton("D", Enum.KeyCode.D, UDim2.new(0, 36, 0, 36), UDim2.new(1, -46, 0, 52))   
+
+----------------------------------------------------
+-- 2. KHUNG BÊN PHẢI: NÚT SPACE BẤM TỰ NHẢY & STOP ALL
+----------------------------------------------------
+local RightGui = Instance.new("ScreenGui")
+RightGui.Name = "DeltaRightMacro"
+RightGui.Parent = game.CoreGui
+RightGui.ResetOnSpawn = false
+
+local RightFrame = Instance.new("Frame")
+RightFrame.Name = "RightFrame"
+RightFrame.Parent = RightGui
+RightFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+RightFrame.BackgroundTransparency = 0.2
+RightFrame.Position = UDim2.new(1, -140, 0.4, 0) 
+RightFrame.Size = UDim2.new(0, 110, 0, 110)
+RightFrame.Active = true
+RightFrame.Draggable = true
+Instance.new("UICorner", RightFrame).CornerRadius = UDim.new(0, 10)
+
+-- Nút Space nhảy tự động (Bấm phát tự nhảy liên tục)
+local SpaceBtn = Instance.new("TextButton")
+SpaceBtn.Size = UDim2.new(0.85, 0, 0, 40)
+SpaceBtn.Position = UDim2.new(0.075, 0, 0, 12)
+SpaceBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+SpaceBtn.Text = "Space"
+SpaceBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+SpaceBtn.TextSize = 16
+SpaceBtn.Font = Enum.Font.SourceSansBold
+SpaceBtn.Parent = RightFrame
+Instance.new("UICorner", SpaceBtn).CornerRadius = UDim.new(0, 6)
+buttons["Space"] = SpaceBtn
+
+task.spawn(function()
+    while true do
+        if states["Space"] then
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+            task.wait(0.05)
+            VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+            task.wait(0.3) 
+        else
+            task.wait(0.1)
+        end
+    end
+end)
+
+SpaceBtn.MouseButton1Click:Connect(function()
+    states["Space"] = not states["Space"]
+    if states["Space"] then
+        SpaceBtn.BackgroundColor3 = Color3.fromRGB(46, 139, 87)
+    else
+        SpaceBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    end
+end)
+
+-- Nút STOP ALL để cứu cánh khi kẹt phím
+local StopBtn = Instance.new("TextButton")
+StopBtn.Size = UDim2.new(0.85, 0, 0, 36)
+StopBtn.Position = UDim2.new(0.075, 0, 0, 60)
+StopBtn.BackgroundColor3 = Color3.fromRGB(178, 34, 34) 
+StopBtn.Text = "STOP ALL"
+StopBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+StopBtn.TextSize = 13
+StopBtn.Font = Enum.Font.SourceSansBold
+StopBtn.Parent = RightFrame
+Instance.new("UICorner", StopBtn).CornerRadius = UDim.new(0, 6)
+
+StopBtn.MouseButton1Click:Connect(function()
+    for k, _ in pairs(states) do states[k] = false end
+    
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
+    
+    for _, btn in pairs(buttons) do btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60) end
+end)
